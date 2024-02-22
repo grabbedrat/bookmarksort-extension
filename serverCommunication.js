@@ -1,5 +1,5 @@
 // Handling communication with the server
-import { stripUnneededInfo, saveBookmarksToFile } from './bookmarkUtils.js';
+import { stripUnneededInfo, saveBookmarksToFile } from 'bookmarkUtils.js';
 
 function sendBookmarksToServer() {
     browser.bookmarks.getTree().then(bookmarkItems => {
