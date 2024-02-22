@@ -16,7 +16,7 @@ function saveBookmarksToFile(bookmarkItems) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "cleaned_bookmarks_backup.json";
+    a.download = "bookmarks_backup.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

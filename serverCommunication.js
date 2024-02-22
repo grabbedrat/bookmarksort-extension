@@ -1,18 +1,23 @@
 // Handling communication with the server
-import { stripUnneededInfo, saveBookmarksToFile } from 'bookmarkUtils.js';
+import { stripUnneededInfo, saveBookmarksToFile } from './bookmarkUtils.js';
 
 function sendBookmarksToServer() {
-    browser.bookmarks.getTree().then(bookmarkItems => {
+    return browser.bookmarks.getTree().then(bookmarkItems => {
         bookmarkItems.forEach(item => stripUnneededInfo(item));
         saveBookmarksToFile(bookmarkItems); // Optionally comment out if saving locally is not needed before sending
 
         const bookmarksData = JSON.stringify(bookmarkItems, null, 2);
-        fetch('http://localhost:5000/cluster', {
+        return fetch('http://localhost:5000/cluster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', },
             body: bookmarksData,
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with status ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             console.log('Success:', data);
             const processedBookmarkData = JSON.stringify(data, null, 2);

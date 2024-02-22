@@ -1,5 +1,5 @@
 // Importing sendBookmarksToServer function
-import './serverCommunication.js';
+import { sendBookmarksToServer } from './servercommunication.js';
 
 function toggleWaitingIndicator(show) {
     const indicator = document.getElementById('waitingIndicator');
