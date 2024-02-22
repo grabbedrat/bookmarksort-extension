@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bookmark Saver</title>
+    <style>
+        body {
+            width: 200px;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+        }
+        #saveBookmarksButton {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border: none;
+            cursor: pointer;
+        }
+        #saveBookmarksButton:hover {
+            background-color: #45a049;
+        }
+        #waitingIndicator {
+            display: none;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <button id="saveBookmarksButton">Save Bookmarks</button>
+    <div id="waitingIndicator">Processing...</div>
+    <script type="module" src="eventHandlers.js"></script>
+</body>
+</html>
