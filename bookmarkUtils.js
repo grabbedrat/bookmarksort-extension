@@ -1,26 +1,23 @@
-// Functions related to bookmark processing
+// bookmarkUtils.js
+export function simplifyBookmarkData(bookmarkItem, parentTags = []) {
+    console.log('simplifyBookmarkData');
+    let simplifiedBookmarks = [];
 
-function stripUnneededInfo(bookmarkItem) {
-    delete bookmarkItem.id;
-    delete bookmarkItem.index;
-    delete bookmarkItem.parentId;
-
-    if (bookmarkItem.children) {
-        bookmarkItem.children.forEach(child => stripUnneededInfo(child));
+    if (bookmarkItem.url) {
+        simplifiedBookmarks.push({
+            name: bookmarkItem.title,
+            url: bookmarkItem.url,
+            tags: parentTags,
+        });
     }
+    
+    if (bookmarkItem.children) {
+        bookmarkItem.children.forEach(child => {
+            const tagsForChildren = [...parentTags, bookmarkItem.title].filter(Boolean);
+            simplifiedBookmarks.push(...simplifyBookmarkData(child, tagsForChildren));
+        });
+    }
+
+    return simplifiedBookmarks;
 }
 
-function saveBookmarksToFile(bookmarkItems) {
-    const bookmarksData = JSON.stringify(bookmarkItems, null, 2);
-    const blob = new Blob([bookmarksData], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "bookmarks_backup.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-export { stripUnneededInfo, saveBookmarksToFile };

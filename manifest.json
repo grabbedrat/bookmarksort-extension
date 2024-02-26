@@ -9,7 +9,8 @@
   },
 
   "permissions": [
-    "bookmarks"
+    "bookmarks",
+    "*://localhost:5000/*"
   ],
 
   "browser_action": {
