@@ -1,93 +1,71 @@
 // serverCommunication.js
-import { simplifyBookmarkData } from './bookmarkUtils.js';
-
-export async function sendBookmarksToServer() {
+export async function sendBookmarksToServer(backup = true) {
     try {
-        const bookmarkItems = await browser.bookmarks.getTree();
-        //console.log('Bookmark items:', bookmarkItems);
-        const simplifiedBookmarks = simplifyBookmarkData(bookmarkItems[0]);
-        //console.log('Simplified bookmarks:', simplifiedBookmarks);
-        const bookmarksData = JSON.stringify(simplifiedBookmarks);
-        //console.log('Sending data to server:', bookmarksData);
+        // Assuming bookmarks are stored in a local variable or can be fetched from your application's state
+        const bookmarks = getBookmarksFromApplicationState(); // You need to define this function
+        
+        // Implement backup logic here if backup is true
+        if (backup) {
+            console.log('Backup is enabled - backing up bookmarks...');
+            backupBookmarks(bookmarks); // Backs up bookmarks to localStorage or another storage mechanism
+        }
 
-        const response = await fetch('http://localhost:5000/cluster', {
+        // Convert bookmarks to JSON
+        const bookmarksJson = JSON.stringify(bookmarks);
+
+        // Send bookmarks to the server
+        const response = await fetch('https://your-server-endpoint.com/api/bookmarks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: bookmarksData,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: bookmarksJson,
         });
 
         if (!response.ok) {
-            throw new Error(`Server responded with status: ${response.status}`);
-        } else {
-            console.log('Bookmarks received by server successfully.');
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        // Handle response from the server
+        const result = await response.json();
+        console.log('Bookmarks successfully sent to the server:', result);
+        displaySuccessMessage('Bookmarks successfully backed up and sent to the server.');
 
-        // Check if the server response is in the expected format or validates correctly
-        // Assuming a simple validation for this example; adjust based on your actual data structure and requirements
-        //if (data && Array.isArray(data)) {
-          //  await removeAllBookmarks();
-            await createBookmarksFromJSON(data);
-            console.log('Bookmarks updated successfully.');
-        //} else {
-        //    throw new Error('Invalid data format received from server');
-        //}
     } catch (error) {
         console.error('Error:', error);
+        displayErrorMessage(error.message); // Display error message on UI
     }
 }
 
-// Removes all user-created bookmarks while preserving the root folders
-function removeAllBookmarks() {
-    return browser.bookmarks.getTree()
-        .then(bookmarkItems => {
-            // Flatten the tree to get all bookmark IDs except for the root folders
-            const allBookmarkIds = [];
-            const traverseBookmarks = (items) => {
-                items.forEach(item => {
-                    // Check if the item is a root folder by ensuring it doesn't have a parentId
-                    if (item.parentId) {
-                        allBookmarkIds.push(item.id);
-                    }
-                    if (item.children) {
-                        traverseBookmarks(item.children);
-                    }
-                });
-            };
-            traverseBookmarks(bookmarkItems);
-
-            // Remove each bookmark or folder found
-            const removalPromises = allBookmarkIds.map(id => browser.bookmarks.removeTree(id));
-            return Promise.all(removalPromises);
-        });
+function backupBookmarks(bookmarks) {
+    // Here we're using localStorage for simplicity, but you might use IndexedDB or another method for larger data sets
+    localStorage.setItem('bookmarksBackup', JSON.stringify(bookmarks));
+    console.log('Bookmarks backed up locally.');
 }
 
+function getBookmarksFromApplicationState() {
+    // Placeholder for fetching bookmarks from your application's state or storage
+    // This needs to be implemented based on how your application manages bookmarks
+    return []; // Return an array of bookmarks
+}
 
-// Creates bookmarks and folders from a structured JSON object
-function createBookmarksFromJSON(bookmarksData) {
-    console.log('Creating bookmarks from JSON:', bookmarksData);
-    const createBookmark = (parentId, { name, url }) => {
-        return browser.bookmarks.create({
-            parentId,
-            title: name,
-            url
-        });
-    };
+function displayErrorMessage(message) {
+    const errorContainer = document.getElementById('errorContainer');
+    errorContainer.textContent = `Error: ${message}`; // Set error message
+    errorContainer.style.display = 'block'; // Show the error message
+}
 
-    const createFolderAndBookmarks = (folderName, bookmarks) => {
-        return browser.bookmarks.create({ title: folderName })
-            .then(folder => {
-                // Create all bookmarks in this folder
-                const bookmarkPromises = bookmarks.map(bookmark => createBookmark(folder.id, bookmark));
-                return Promise.all(bookmarkPromises);
-            });
-    };
+function displaySuccessMessage(message) {
+    const successContainer = document.getElementById('successContainer') || createSuccessContainer();
+    successContainer.textContent = message; // Set success message
+    successContainer.style.display = 'block'; // Show the success message
+}
 
-    // Process each folder and its bookmarks
-    const folderPromises = Object.entries(bookmarksData).map(([folderName, bookmarks]) => 
-        createFolderAndBookmarks(folderName, bookmarks)
-    );
-    console.log('Folder promises:', folderPromises);
-    return Promise.all(folderPromises);
+function createSuccessContainer() {
+    const container = document.createElement('div');
+    container.id = 'successContainer';
+    container.style.display = 'none'; // Hidden by default
+    container.style.color = 'green'; // Success color
+    document.body.appendChild(container);
+    return container;
 }

@@ -10,7 +10,8 @@
 
   "permissions": [
     "bookmarks",
-    "*://localhost:5000/*"
+    "http://localhost:5000/*",
+    "https://your-server-endpoint.com/api/bookmarks"
   ],
 
   "browser_action": {
