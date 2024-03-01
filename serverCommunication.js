@@ -2,7 +2,7 @@
 export async function sendBookmarksToServer(backup = true) {
     try {
         // Assuming bookmarks are stored in a local variable or can be fetched from your application's state
-        const bookmarks = getBookmarksFromApplicationState(); // You need to define this function
+        const bookmarks = await getBookmarksFromApplicationState(); // You need to define this function
         
         // Implement backup logic here if backup is true
         if (backup) {
@@ -10,11 +10,15 @@ export async function sendBookmarksToServer(backup = true) {
             backupBookmarks(bookmarks); // Backs up bookmarks to localStorage or another storage mechanism
         }
 
+        console.log('Pre-json bookmark data (returned from getfromappstate: ):', bookmarks);
+
         // Convert bookmarks to JSON
         const bookmarksJson = JSON.stringify(bookmarks);
 
+        console.log('Sending bookmarks to the server:', bookmarksJson);
+
         // Send bookmarks to the server
-        const response = await fetch('https://your-server-endpoint.com/api/bookmarks', {
+        const response = await fetch('http://127.0.0.1:5000/cluster', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -43,11 +47,41 @@ function backupBookmarks(bookmarks) {
     console.log('Bookmarks backed up locally.');
 }
 
-function getBookmarksFromApplicationState() {
-    // Placeholder for fetching bookmarks from your application's state or storage
-    // This needs to be implemented based on how your application manages bookmarks
-    return []; // Return an array of bookmarks
+async function getBookmarksFromApplicationState() {
+    try {
+        // Get the entire bookmark tree
+        const bookmarkTree = await browser.bookmarks.getTree();
+
+        // Process the bookmark tree to extract individual bookmarks
+        const bookmarks = [];
+        processBookmarkTree(bookmarkTree, bookmarks);
+
+        console.log('getBookmarksFromAppState Returns', bookmarks);
+        return bookmarks;
+    } catch (error) {
+        console.error('Error retrieving bookmarks:', error);
+        throw new Error('Failed to retrieve bookmarks');
+    }
 }
+
+// Recursive function to process the bookmark tree
+function processBookmarkTree(bookmarkTree, bookmarks) {
+    for (let node of bookmarkTree) {
+        if (node.url) {
+            // If the node has a URL, it's a bookmark
+            bookmarks.push({
+                name: node.title,
+                url: node.url,
+                // You can add more properties like tags if necessary
+            });
+        } else if (node.children) {
+            // If the node has children, it's a folder
+            processBookmarkTree(node.children, bookmarks);
+        }
+        // Ignore other types of nodes like separators
+    }
+}
+
 
 function displayErrorMessage(message) {
     const errorContainer = document.getElementById('errorContainer');
