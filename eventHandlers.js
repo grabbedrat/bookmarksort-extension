@@ -1,142 +1,117 @@
 // eventHandlers.js
-
-// This file contains the event handlers and DOM manipulation logic
-// for the BookmarkSorter Firefox extension.
-
 import { sendBookmarksToServer } from "./serverCommunication.js";
+import { simplifyBookmarkData } from "./bookmarkUtils.js";
 
-// Helper function to get an element by ID with error handling.
-function safelyGetElementById(
-  id,
-  createIfNotFound = false,
-  createFunction = null,
-) {
+const debugMode = true;
+
+function safelyGetElementById(id) {
   const element = document.getElementById(id);
-  if (element) {
-    return element;
-  }
-  if (createIfNotFound && typeof createFunction === "function") {
-    return createFunction();
-  }
-  throw new Error(
-    `Element with id '${id}' not found and no creation function provided.`,
+  if (!element) throw new Error(`Element with id '${id}' not found.`);
+  return element;
+}
+
+function removeBookmarksRecursively(bookmarkItems) {
+  return Promise.all(
+    bookmarkItems.map((item) => {
+      if (item.children) {
+        // Recursively remove children first
+        return removeBookmarksRecursively(item.children).then(() => {
+          // After all children are removed, remove the folder itself if it's not a root folder
+          if (item.id !== "0" && item.id !== "1" && item.id !== "2") {
+            // Assuming "0", "1", and "2" are IDs of root folders
+            return browser.bookmarks.remove(item.id);
+          }
+        });
+      } else {
+        // Remove the bookmark
+        return browser.bookmarks.remove(item.id);
+      }
+    }),
   );
 }
 
-// Helper function to append a child element safely with error handling.
-function safeAppendChild(parent, child) {
-  try {
-    parent.appendChild(child);
-  } catch (error) {
-    console.error("Error appending child element:", error);
-    throw error;
-  }
-}
-
-// This function initializes the UI elements and their event listeners.
-function initializeUI() {
-  const saveButton = safelyGetElementById("saveBookmarksButton");
-  const indicator = safelyGetElementById("waitingIndicator");
-  let errorContainer = null;
-  try {
-    errorContainer = safelyGetElementById("errorContainer");
-  } catch {
-    errorContainer = createErrorContainer(); // Create only if not present.
+function setBookmarksInBrowser(sortedBookmarks) {
+  if (typeof browser.bookmarks === "undefined") {
+    console.error("browser.bookmarks API is not available");
+    return;
   }
 
-  let backupCheckbox = null;
-  try {
-    backupCheckbox = safelyGetElementById("backupCheckbox");
-  } catch {
-    backupCheckbox = createBackupCheckbox(true); // Create only if not present, defaulting to checked.
-  }
-
-  // Attach event listener to the save button.
-  saveButton.addEventListener("click", () =>
-    handleSaveButtonClick(indicator, errorContainer, backupCheckbox),
-  );
-}
-
-// This function is called when the 'Save Bookmarks' button is clicked.
-function handleSaveButtonClick(indicator, errorContainer, backupCheckbox) {
-  indicator.style.display = "block"; // Show waiting indicator
-  errorContainer.style.display = "none"; // Hide previous errors
-
-  sendBookmarksToServer(backupCheckbox.checked)
-    .then(updateBookmarksOnPage)
-    .catch((error) => {
-      console.error("Error sending bookmarks to server:", error);
-      showErrorMessage(
-        errorContainer,
-        "Failed to save bookmarks. Please try again later.",
-      );
+  // Remove all non-root bookmarks and folders
+  browser.bookmarks
+    .getTree()
+    .then((bookmarkItems) => {
+      return removeBookmarksRecursively(bookmarkItems[0].children);
     })
-    .finally(() => {
-      indicator.style.display = "none"; // Hide waiting indicator after operation
+    .then(() => {
+      console.log("All non-root bookmarks and folders removed.");
+
+      // Here we use a promise array to track the bookmarks creation promises
+      let creationPromises = [];
+
+      // Add sorted bookmarks
+      Object.entries(sortedBookmarks).forEach(([category, bookmarks]) => {
+        let folderCreationPromise = browser.bookmarks
+          .create({ title: category })
+          .then((newFolder) => {
+            bookmarks.forEach((bookmark) => {
+              creationPromises.push(
+                browser.bookmarks.create({
+                  parentId: newFolder.id,
+                  title: bookmark.name,
+                  url: bookmark.url,
+                }),
+              );
+            });
+          });
+
+        creationPromises.push(folderCreationPromise);
+      });
+
+      // Wait for all bookmarks and folders to be created
+      Promise.all(creationPromises).then(() => {
+        console.log("Bookmarks added to browser.");
+      });
+    })
+    .catch((error) => {
+      console.error("Error setting bookmarks in the browser:", error);
     });
 }
 
-// Creates the error container if it wasn't found in the DOM.
-function createErrorContainer() {
-  const container = document.createElement("div");
-  container.id = "errorContainer";
-  container.style.display = "none";
-  container.classList.add("error-container");
-  document.body.appendChild(container);
-  return container;
-}
+function initializeUI() {
+  const sortButton = safelyGetElementById("saveBookmarksButton");
+  const indicator = safelyGetElementById("waitingIndicator");
+  const errorContainer = safelyGetElementById("errorContainer");
 
-// Displays an error message to the user.
-function showErrorMessage(container, message) {
-  container.textContent = message;
-  container.style.display = "block";
-}
+  sortButton.addEventListener("click", () => {
+    indicator.style.display = "block";
+    errorContainer.style.display = "none";
 
-// Creates the backup checkbox if it wasn't found in the DOM.
-function createBackupCheckbox(checked) {
-  const label = document.createElement("label");
-  label.textContent = " Backup before sending (recommended)";
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.id = "backupCheckbox";
-  checkbox.checked = checked;
-  label.insertBefore(checkbox, label.firstChild);
-  document.body.appendChild(label);
-  return checkbox;
-}
+    browser.bookmarks.getTree().then((bookmarkItems) => {
+      const simplifiedBookmarks = bookmarkItems
+        .flatMap((item) => item.children ? item.children.flatMap(simplifyBookmarkData) : simplifyBookmarkData(item))
+        .map((simplifiedBookmark) => ({ ...simplifiedBookmark, tags: ["Bookmarks Menu"] }));
 
-// Updates the UI with sorted bookmarks received from the server.
-function updateBookmarksOnPage(bookmarkClusters) {
-  let container = null;
-  try {
-    container = safelyGetElementById("bookmarksContainer");
-  } catch {
-    container = document.createElement("div");
-    container.id = "bookmarksContainer";
-    document.body.appendChild(container);
-  }
-
-  // Clear the previous container content.
-  container.innerHTML = "";
-
-  Object.entries(bookmarkClusters).forEach(([clusterName, bookmarks]) => {
-    const clusterDiv = document.createElement("div");
-    const clusterHeading = document.createElement("h3");
-    clusterHeading.textContent = clusterName;
-    clusterDiv.appendChild(clusterHeading);
-
-    bookmarks.forEach((bookmark) => {
-      const bookmarkElement = document.createElement("p");
-      const bookmarkLink = document.createElement("a");
-      bookmarkLink.href = bookmark.url;
-      bookmarkLink.textContent = bookmark.name;
-      bookmarkElement.appendChild(bookmarkLink);
-      safeAppendChild(clusterDiv, bookmarkElement);
+      sendBookmarksToServer(simplifiedBookmarks)
+        .then((sortedBookmarks) => {
+          if (!sortedBookmarks || typeof sortedBookmarks !== 'object') { // Check if response is not valid
+            throw new Error('Received invalid response from the server.');
+          }
+          console.log('Bookmarks successfully sent to the server and received response.');
+          return setBookmarksInBrowser(sortedBookmarks);
+        })
+        .then(() => {
+          console.log('Bookmarks added to the browser successfully.');
+        })
+        .catch((error) => {
+          console.error('Error processing bookmarks:', error);
+          errorContainer.textContent = error.message || 'An unexpected error occurred. Please try again later.';
+          errorContainer.style.display = "block";
+        })
+        .finally(() => {
+          indicator.style.display = "none";
+        });
     });
-
-    safeAppendChild(container, clusterDiv);
   });
 }
 
-// Initialize the UI when the DOM is fully loaded.
 document.addEventListener("DOMContentLoaded", initializeUI);

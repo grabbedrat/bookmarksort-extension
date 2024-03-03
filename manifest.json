@@ -7,13 +7,11 @@
     "48": "icons/bookmark-it.png",
     "96": "icons/bookmark-it@2x.png"
   },
-
   "permissions": [
     "bookmarks",
     "http://localhost:5000/*",
     "https://your-server-endpoint.com/api/bookmarks"
   ],
-
   "browser_action": {
     "default_popup": "popup.html",
     "default_icon": "icons/star-empty-38.png",

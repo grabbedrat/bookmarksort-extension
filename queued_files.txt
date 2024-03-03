@@ -1,4 +1,5 @@
 README.md
+./manifest.json
 ./eventHandlers.js
 ./serverCommunication.js
 ./bookmarkUtils.js
