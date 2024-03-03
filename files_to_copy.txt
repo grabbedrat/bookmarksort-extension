@@ -1,6 +1,5 @@
+README.md
 ./eventHandlers.js
 ./serverCommunication.js
 ./bookmarkUtils.js
-./eventHandlers.js
-./serverCommunication.js
-./bookmarkUtils.js
+./popup.html
