@@ -1,6 +1,6 @@
 README.md
-./manifest.json
 ./eventHandlers.js
 ./serverCommunication.js
+./dep/popup.js
 ./bookmarkUtils.js
-./popup.html
+manifest.json
